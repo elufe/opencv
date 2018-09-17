@@ -97,24 +97,34 @@ int main() {
 }*/
 
 
+
+#include <stdlib.h>
 #include <iostream>
+#include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
-#include <stdlib.h>
+#include <opencv2/imgproc/imgproc.hpp>
 
 using namespace std;
 
-void diff(int * width, int col) {
-	for (int i = 0; i < col - 1; i++) {
-		width[i] = width[i + 1] - width[i];
-	}
-	width[col - 1] = 0;
-}
+
 
 int main(int argc, char* argv[]) {
-	cv::Mat image = cv::imread("C:/Users/msi/Desktop/2.jpg", cv::IMREAD_COLOR);
-	int row = image.rows;//421 세로)
+	cv::Mat image = cv::imread("C:/Users/msi/Desktop/aaa.jpg", cv::IMREAD_COLOR);
+
+	cv::Mat hsv;
+	cv::cvtColor(image, hsv, CV_BGR2HSV);
+
+	std::vector<cv::Mat> channels;
+	cv::split(hsv, channels);
+
+	cv::Mat H = channels[0];
+	cv::Mat S = channels[1];
+	cv::Mat V = channels[2];
+
+
+	int row = image.rows;//421 세로
 	int col = image.cols;//559 가로
 	int a = 1, b = 1, c = 1, d = 1;
 	int width[559] = { 0 };
@@ -130,21 +140,7 @@ int main(int argc, char* argv[]) {
 			color[i][j][0] = image.at<cv::Vec3b>(i, j)[0];
 		}
 	}
-	int sum_row1=0,sum_row0=0;
-	for (int i = 0; i < row; i++) {
-		sum_row1 += color[i][col / 2][1];
-		sum_row0 += color[i][col / 2][0];
-	}
-	sum_row1 /= row;
-	sum_row0 /= row;
 
-	int sum_col1 = 0, sum_col0 = 0;
-	for (int i = 0; i < col; i++) {
-		sum_col1 += color[row/2][i][1];
-		sum_col0 += color[row/2][i][0];
-	}
-	sum_col1 /= col;
-	sum_col0 /= col;
 	//중심 기준 위, 아래 조사후 가장 멀리 있는거
 	int avg0 = 0;
 	int avg1 = 0;
@@ -153,10 +149,10 @@ int main(int argc, char* argv[]) {
 
 	for (int i = row / 2; i > 1; i--) {
 		if (i == row / 2) {
-			avg0 = (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0]);
+			avg0 = (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
 			avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
 		}
-		else if (abs(avg0 - (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0])) > 200) {
+		else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
 			up = i;
 			cout <<"1   "<< i << "\n";
 			break;
@@ -173,10 +169,10 @@ int main(int argc, char* argv[]) {
 
 	for (int i = row / 2; i < row - 1; i++) {
 		if (i == row / 2) {
-			avg0 = (color[i - 1][col/2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0]);
+			avg0 = (color[i - 1][col/2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
 			avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
 		}
-		else if (abs(avg0 - (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0])) > 100) {
+		else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
 			down = i;
 			cout << "2   " << i << "\n";
 			break;
@@ -189,10 +185,10 @@ int main(int argc, char* argv[]) {
 
 	for (int j = col / 2; j > 1; j--) {
 		if (j == col / 2) {
-			avg0 = (color[row / 2][j-1][0] + color[row / 2][j][0] + color[row / 2][j+1][0]);
+			avg0 = (color[row / 2][j-1][2] + color[row / 2][j][2] + color[row / 2][j+1][2]);
 			avg1 = (color[row / 2][j-1][1] + color[row / 2][j][1] + color[row / 2][j+1][1]);
 		}
-		else if (abs(avg0 - (color[row / 2][j - 1][0] + color[row / 2][j][0] + color[row / 2][j + 1][0])) > 100) {
+		else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
 			left = j;
 			cout << "3   " << j << "\n";
 			break;
@@ -207,10 +203,10 @@ int main(int argc, char* argv[]) {
 
 	for (int j = col / 2; j < col-1; j++) {
 		if (j == col / 2) {
-			avg0 = (color[row / 2][j - 1][0] + color[row / 2][j][0] + color[row / 2][j + 1][0]);
+			avg0 = (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2]);
 			avg1 = (color[row / 2][j - 1][1] + color[row / 2][j][1] + color[row / 2][j + 1][1]);
 		}
-		else if (abs(avg0 - (color[row / 2][j - 1][0] + color[row / 2][j][0] + color[row / 2][j + 1][0])) > 100) {
+		else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
 			right = j;
 			cout << "4   " << j << "\n";
 			break;
@@ -224,10 +220,10 @@ int main(int argc, char* argv[]) {
 	for (int j = left; j < right; j++) {
 		for (int i = row / 2; i > 1; i--) {
 			if (i == row / 2) {
-				avg0 = (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0]);
+				avg0 = (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
 				avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
 			}
-			else if (abs(avg0 - (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0])) > 100) {
+			else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
 				up2 = i;
 				cout << "1   " << i << "\n";
 				break;
@@ -244,10 +240,10 @@ int main(int argc, char* argv[]) {
 	for (int j = left; j < right; j++) {
 		for (int i = row / 2; i < row-1; i++) {
 			if (i == row / 2) {
-				avg0 = (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0]);
+				avg0 = (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
 				avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
 			}
-			else if (abs(avg0 - (color[i - 1][col / 2][0] + color[i][col / 2][0] + color[i + 1][col / 2][0])) > 100) {
+			else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
 				down2 = i;
 				cout << "2   " << i << "\n";
 				break;
@@ -266,10 +262,10 @@ int main(int argc, char* argv[]) {
 	for (int i = up; i < down; i++) {
 		for (int j = col / 2; j > 1; j--) {
 			if (j == col / 2) {
-				avg0 = (color[i][j - 1][0] + color[i][j][0] + color[i][j + 1][0]);
+				avg0 = (color[i][j - 1][2] + color[i][j][2] + color[i][j + 1][2]);
 				avg1 = (color[i][j - 1][1] + color[i][j][1] + color[i][j + 1][1]);
 			}
-			else if (abs(avg0 - (color[row / 2][j - 1][0] + color[row / 2][j][0] + color[row / 2][j + 1][0])) > 100) {
+			else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
 				left2 = j;
 				cout << "3   " << j << "\n";
 				break;
@@ -287,10 +283,10 @@ int main(int argc, char* argv[]) {
 	for (int i = up; i < down; i++) {
 		for (int j = col / 2; j < col-1; j++) {
 			if (j == col / 2) {
-				avg0 = (color[i][j - 1][0] + color[i][j][0] + color[i][j + 1][0]);
+				avg0 = (color[i][j - 1][2] + color[i][j][2] + color[i][j + 1][2]);
 				avg1 = (color[i][j - 1][1] + color[i][j][1] + color[i][j + 1][1]);
 			}
-			else if (abs(avg0 - (color[row / 2][j - 1][0] + color[row / 2][j][0] + color[row / 2][j + 1][0])) > 100) {
+			else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
 				right2 = j;
 				cout << "3   " << j << "\n";
 				break;
@@ -451,11 +447,14 @@ int main(int argc, char* argv[]) {
 
 
 	// create 4 windows
-	cv::namedWindow("Original Image");
-
+	cv::namedWindow("Original Imageh");
+	cv::namedWindow("Original Images");
+	cv::namedWindow("Original Imagev");
 
 	// show 4 windows
-	cv::imshow("Original Image", image);
+	cv::imshow("Original Imageh", image);
+	cv::imshow("Original Images", S);
+	cv::imshow("Original Imagev", V);
 	cv::waitKey(0);
 
 
