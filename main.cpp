@@ -1,463 +1,415 @@
-/*
 #include <iostream>
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/highgui.hpp>
-using namespace std;
-
-int main(int argc, char* argv[]) {
-	// load an image
-	cv::Mat lena = cv::imread("C:/Users/msi/Desktop/lena.png", cv::IMREAD_COLOR);
-
-	// create a matrix for split
-	cv::Mat bgr[3];
-
-	// split image into 3 single-channel matrices
-	cv::split(lena, bgr);
-
-	// create 4 windows
-	cv::namedWindow("Original Image");
-	cv::namedWindow("Red Channel");
-	cv::namedWindow("Green Channel");
-	cv::namedWindow("Blue Channel");
-
-
-	// show 4 windows
-	cv::imshow("Original Image", lena);
-	cv::imshow("Red Channel", bgr[2]);  // caution : the red channel index is 2!
-	cv::imshow("Green Channel", bgr[1]);
-	cv::imshow("Blue Channel", bgr[0]);
-
-	cv::waitKey(0);
-	return 0;
-}*/
-/*
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include<iostream>
-#include<cstdio>
-
-
-using namespace cv;
-using namespace std;
-
-
-int main() {
-
-	Mat image;
-	Mat cut[4];
-	Mat dst[4];
-	Mat bgr[3];
-	Mat hist[4];
-	int channel[] = { 0,1 };
-	int histSize[] = { 256 };
-	float range[] = { 0,256 };
-	const float * ranges[] = { range };
-
-	image = imread("C:/Users/msi/Documents/카카오톡 받은 파일/피부암 (1).jpg", CV_LOAD_IMAGE_COLOR);
-	int row = image.rows; int col = image.cols;
-	printf("%d %d ", row, col);
-
-
-
-
-
-	cut[0] = image(Range(0, row / 2), Range(0, col / 2));//1사분면
-
-	flip(image, cut[1], 1);//좌우반전
-	cut[1] = cut[1](Range(0, row / 2), Range(0, col / 2)); //2사분면
-
-	flip(image, cut[2], -1);//다 반전
-	cut[2] = cut[2](Range(0, row / 2), Range(0, col / 2)); //4사분면
-
-	flip(image, cut[3], 0);//상하반전
-	cut[3] = cut[3](Range(0, row / 2), Range(0, col / 2)); // 3사분면
-
-	for (int i = 0; i < 4; i++) cvtColor(cut[i], dst[i], CV_BGR2HSV);//CV_HSV2BGR
-
-	for (int i = 0; i < 4; i++) calcHist(&dst[i], 1, channel, Mat(), hist[i], 1, histSize, ranges, true, false);
-
-
-	double result[4][4];
-
-	for (int i = 0; i < 4; i++)
-		for (int j = 0; j < 4; j++)
-			result[i][j] = compareHist(hist[i], hist[j], 0);
-
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			printf("%.6f ", result[i][j]);
-		}
-		cout << endl;
-	}
-
-	return 0;
-
-}*/
-
-
-
-#include <stdlib.h>
-#include <iostream>
+#include <cstdio>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include <cstring>
+#include <fstream>
+#include <cstdlib>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+
 using namespace std;
 
+void error_handling(char* str) {
+	cout << str << endl;
+	exit(-1);
+}
 
+cv::Mat masking(cv::Mat, int, int);//return masking image
+void fill(cv::Mat);
+int boundary(int *, int *);
+
+int * find(cv::Mat);//return left,right,top,bottom
+cv::Mat cutting(cv::Mat, int *);//return cuting image
+float histogram(cv::Mat);
+float symmetry(cv::Mat);// return degree of symmetry
 
 int main(int argc, char* argv[]) {
-	cv::Mat image = cv::imread("C:/Users/msi/Desktop/aaa.jpg", cv::IMREAD_COLOR);
+	const int BUF_SIZE = 1280 * 720;
+	char message[BUF_SIZE];
+	int str_len;
+	const int PORT = 3000;
+	struct sockaddr_in serv_addr;
+	struct sockaddr_in clnt_addr;
 
-	cv::Mat hsv;
-	cv::cvtColor(image, hsv, CV_BGR2HSV);
+	int serv_sock = socket(PF_INET, SOCK_STREAM, 0);
+	if (serv_sock == -1)
+		error_handling("socket() error");
+	cout << "socket()" << endl;
+	memset(&serv_addr, 0, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serv_addr.sin_port = htons(PORT);
 
-	std::vector<cv::Mat> channels;
-	cv::split(hsv, channels);
 
-	cv::Mat H = channels[0];
-	cv::Mat S = channels[1];
-	cv::Mat V = channels[2];
+	if (::bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1)
+		error_handling("bind() error");
+	cout << "bind()" << endl;
+	if (listen(serv_sock, 1) == -1)
+		error_handling("listen() error");
+	cout << "listen()" << endl;
+	socklen_t clnt_addr_size = sizeof(clnt_addr);
+	int clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+	if (clnt_sock == -1)
+		error_handling("accept() error");
+	cout << "Connected" << endl;
 
-
-	int row = image.rows;//421 세로
-	int col = image.cols;//559 가로
-	int a = 1, b = 1, c = 1, d = 1;
-	int width[559] = { 0 };
-	float width_f[624] = { 0,0 };
-	int color[421][559][3] = { 0 };
-	int red = 0;
-	int green = 0;
-	int blue = 0;
-	for (int i = 0; i < row; i++) {
-		for (int j = 0; j < col; j++) {
-			color[i][j][2] = image.at<cv::Vec3b>(i, j)[2];
-			color[i][j][1] = image.at<cv::Vec3b>(i, j)[1];
-			color[i][j][0] = image.at<cv::Vec3b>(i, j)[0];
-		}
+	int sum = 0;
+	ofstream outFile("/Users/suhyeongcho/Desktop/Github/opencv/opencv/output.jpg");
+	while (sum < 1280 * 720) {
+		str_len = read(clnt_sock, message, BUF_SIZE);
+		//if(str_len <=0) break;
+		sum += str_len;
+		cout << "str_len : " << str_len << endl;
+		cout << "sum : " << sum << endl;
+		for (int i = 0; i < str_len; i++)
+			outFile << message[i];
 	}
+	outFile.close();
+	cout << "sum : " << sum << endl;
 
-	//중심 기준 위, 아래 조사후 가장 멀리 있는거
-	int avg0 = 0;
-	int avg1 = 0;
 
-	int up = 0;
+	cv::Mat image = cv::imread("C:/Users/msi/Desktop/예제.jpg", cv::IMREAD_COLOR);//원본 이미지
+	cv::Mat original = cv::imread("C:/Users/msi/Desktop/예제.jpg", cv::IMREAD_COLOR);//원본 이미지
 
-	for (int i = row / 2; i > 1; i--) {
-		if (i == row / 2) {
-			avg0 = (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
-			avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
+	cv::Mat black;
+	cv::Mat rough;
+	cv::imshow("img", image);
+	int row = image.rows;//세로
+	int col = image.cols;//가로
+	int * index;
+	int * index2;
+	int resultA = -1, resultB = -1, resultC = -1, total = 0;
+	int cloudy = 30;
+	while (true) {
+		black = masking(image, cloudy, cloudy);
+		index = find(black);
+		int sum = 0;
+		for (int i = 0; i < 4; i++)
+			sum += index[i];
+		if (sum == 0) {//못잡았다는 뜻
+			cloudy -= 10;
 		}
-		else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
-			up = i;
-			cout <<"1   "<< i << "\n";
+		else {
 			break;
 		}
 	}
+	cv::imshow("black", black);
+	rough = masking(image, cloudy - 5, cloudy);
+	index2 = find(rough);
+
+	resultB = boundary(index, index2) * 100;//return result B 1이면 암 0이면 점
+
+	cv::Mat capture = cutting(black, index);
+
+	fill(capture);
+	resultA = (int)symmetry(capture);//return result A
+	resultA = 100 - resultA;
+
+	original = cutting(original, index);
+	cv::imshow("cut", original);
+	resultC = (int)histogram(original);//return result C
+
+	total = (resultA + resultB + resultC) / 3;
+
+	cout << "*********************" << endl;
+	cout << "cloud : " << cloudy << endl;
+	cout << "result A : " << resultA << "%" << endl;//100% 기준으로 대칭성
+	cout << "result B : " << resultB << "%" << endl;//1이면 암
+	cout << "result C : " << resultC << "%" << endl;//count/40*100
+	cout << "*********************" << endl;
+
+	char intStr1[10];
+
+	char intStr2[10];
+
+	char intStr3[10];
+
+	char intStr4[10];
+
+	sprintf(intStr1, "%d", total);
+	sprintf(intStr2, "%d", resultA);
+	sprintf(intStr3, "%d", resultB);
+	sprintf(intStr4, "%d", resultC);
 
 
-	avg0 = 0;
-	avg1 = 0;
+	strcat(intStr1, ",");
+	strcat(intStr1, intStr2);
+	strcat(intStr1, ",");
+	strcat(intStr1, intStr3);
+	strcat(intStr1, ",");
+	strcat(intStr1, intStr4);
 
+	strcpy(message, intStr1);
 
+	cout << message << endl;
+	int result = write(clnt_sock, message, strlen(message));
+	cout << result << endl;
 
-	int down=0;
+	cout << "close" << endl;
 
-	for (int i = row / 2; i < row - 1; i++) {
-		if (i == row / 2) {
-			avg0 = (color[i - 1][col/2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
-			avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
-		}
-		else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
-			down = i;
-			cout << "2   " << i << "\n";
-			break;
-		}
-	}
-
-	avg0 = 0;
-	avg1 = 0;
-	int left = 0;
-
-	for (int j = col / 2; j > 1; j--) {
-		if (j == col / 2) {
-			avg0 = (color[row / 2][j-1][2] + color[row / 2][j][2] + color[row / 2][j+1][2]);
-			avg1 = (color[row / 2][j-1][1] + color[row / 2][j][1] + color[row / 2][j+1][1]);
-		}
-		else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
-			left = j;
-			cout << "3   " << j << "\n";
-			break;
-		}
-	}
-
-
-
-	avg0 = 0;
-	avg1 = 0;
-	int right = 0;
-
-	for (int j = col / 2; j < col-1; j++) {
-		if (j == col / 2) {
-			avg0 = (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2]);
-			avg1 = (color[row / 2][j - 1][1] + color[row / 2][j][1] + color[row / 2][j + 1][1]);
-		}
-		else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
-			right = j;
-			cout << "4   " << j << "\n";
-			break;
-		}
-	}
-
-	avg0 = 0;
-	avg1 = 0;
-	int up2;
-	int up3 = 999;
-	for (int j = left; j < right; j++) {
-		for (int i = row / 2; i > 1; i--) {
-			if (i == row / 2) {
-				avg0 = (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
-				avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
-			}
-			else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
-				up2 = i;
-				cout << "1   " << i << "\n";
-				break;
-			}
-		}
-		if (up3 > up2)
-			up3 = up2;
-	}
-
-	avg0 = 0;
-	avg1 = 0;
-	int down2;
-	int down3 = 0;
-	for (int j = left; j < right; j++) {
-		for (int i = row / 2; i < row-1; i++) {
-			if (i == row / 2) {
-				avg0 = (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2]);
-				avg1 = (color[i - 1][col / 2][1] + color[i][col / 2][1] + color[i + 1][col / 2][1]);
-			}
-			else if (abs(avg0 - (color[i - 1][col / 2][2] + color[i][col / 2][2] + color[i + 1][col / 2][2])) > 200) {
-				down2 = i;
-				cout << "2   " << i << "\n";
-				break;
-			}
-		}
-		if (down3 < down2)
-			down3 = down2;
-	}
-
-
-	
-	avg0 = 0;
-	avg1 = 0;
-	int left2 = 0;
-	int left3 = 999;
-	for (int i = up; i < down; i++) {
-		for (int j = col / 2; j > 1; j--) {
-			if (j == col / 2) {
-				avg0 = (color[i][j - 1][2] + color[i][j][2] + color[i][j + 1][2]);
-				avg1 = (color[i][j - 1][1] + color[i][j][1] + color[i][j + 1][1]);
-			}
-			else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
-				left2 = j;
-				cout << "3   " << j << "\n";
-				break;
-			}
-
-		}
-		if (left3 > left2)
-			left3 = left2;
-	}
-
-	avg0 = 0;
-	avg1 = 0;
-	int right2 = 0;
-	int right3 = 0;
-	for (int i = up; i < down; i++) {
-		for (int j = col / 2; j < col-1; j++) {
-			if (j == col / 2) {
-				avg0 = (color[i][j - 1][2] + color[i][j][2] + color[i][j + 1][2]);
-				avg1 = (color[i][j - 1][1] + color[i][j][1] + color[i][j + 1][1]);
-			}
-			else if (abs(avg0 - (color[row / 2][j - 1][2] + color[row / 2][j][2] + color[row / 2][j + 1][2])) > 200) {
-				right2 = j;
-				cout << "3   " << j << "\n";
-				break;
-			}
-
-		}
-		if (right3 < right2)
-			right3 = right2;
-	}
-
-			   
-
-
-
-	
-	/*  연달아서 2개 3개 평균 비교해보기
-
-	for (int i = row / 2; i < row - 1; i++) {
-		if (color[i][col/2][0]>sum_row0+30&&
-			color[i][col / 2][1] > sum_row1 + 30) {
-			cout << i << ", ";
-	//		a = i;
-			break;
-		}
-	}
-
-	for (int i = row / 2; i > 0; i--) {
-		if (color[i][col / 2][0] > sum_row0 + 30 &&
-			color[i][col / 2][1] > sum_row1 + 30) {
-			cout << i << ", ";
-	//		b = i;
-			break;
-		}
-	}
-
-	for (int j = col / 2; j < col - 1; j++) {
-		if (color[row/2][j][0] > sum_col0 + 10 &&
-			color[row / 2][j][1] > sum_col1 + 10) {
-			cout << j << ", ";
-			c = j;
-			break;
-		}
-	}
-
-	for (int j = col / 2; j > 0; j--) {
-		if (color[row / 2][j][0] > sum_col0 + 10 &&
-			color[row / 2][j][1] > sum_col1 + 10) {
-			cout << j << ", ";
-			d = j;
-			break;
-		}
-	}
-	*/
-
-	/*
-	
-	for (int i = row / 2; i < row - 1; i++) {
-		if ((abs(sum_row0 - color[i][col / 2][0]) +
-			abs(sum_row1 - color[i][col / 2][1]) +
-			abs(color[row / 2][col / 2][2] - color[i][col / 2][2])) > 150) {
-			cout << i << ", ";
-			a = i;
-			break;
-		}
-	}
-
-	for (int i = row / 2; i > 0; i--) {
-		if ((abs(sum_row0 - color[i][col / 2][0]) +
-			abs(sum_row1 - color[i][col / 2][1]) +
-				abs(color[row / 2][col / 2][2] - color[i][col / 2][2])) > 150) {
-			cout << i << ", ";
-			b = i;
-			break;
-		}
-	}
-	for (int j = col / 2; j < col - 1; j++) {
-		if ((abs(sum_col0 - color[row / 2][j][0]) +
-			abs(sum_col1 - color[row / 2][j][1]) +
-			abs(color[row / 2][col / 2][2] - color[i][col / 2][2])) > 150) {
-			cout << j << ", ";
-			c = j;
-			break;
-		}
-	}
-	for (int j = col / 2; j > 0; j--) {
-		cout << abs(sum_col0 - color[row / 2][j][0]) + abs(sum_col1 - color[row / 2][j][1]);
-		cout << "\n";
-		if ((abs(sum_col0 - color[row / 2][j][0]) +
-			abs(sum_col1 - color[row / 2][j][1]) +
-			abs(color[row / 2][col / 2][2] - color[i][col / 2][2])) > 150) {
-			cout << j << ", ";
-			d = j;
-			break;
-		}
-	}
-	*/
-/*	int sub=0;
-	for (int i = row/2; i < row-10; i++) {
-		if(sub < color[i + 10][col / 2][0] - color[i][col / 2][0]+color[i + 10][col / 2][1] - color[i][col / 2][1]){
-			a = i;
-			sub = color[i +10][col / 2][0] - color[i][col / 2][0] + color[i + 10][col / 2][1] - color[i][col / 2][1];
-			cout << "a" <<sub << "\t"<< a << "\n";
-		}
-	}
-	sub = 0;
-	for (int i = row / 2; i > 10; i--) {
-		if (sub < color[i + 10][col / 2][0] - color[i][col / 2][0] + color[i + 10][col / 2][1] - color[i][col / 2][1]) {
-			b = i;
-			sub = color[i + 10][col / 2][0] - color[i][col / 2][0] + color[i + 10][col / 2][1] - color[i][col / 2][1];
-			cout << "b" << sub << "\t" << b << "\n";
-
-		}
-	}
-
-	sub = 0;
-	for (int j = col / 2; j < col-10; j++) {
-		if (sub < color[row/2][j+10][0] - color[row/2][j][0] + color[row/2][j+10][1] - color[row/2][j][1]) {
-			c = j;
-			sub = color[row / 2][j + 10][0] - color[row / 2][j][0] + color[row / 2][j + 10][1] - color[row / 2][j][1];
-			cout << "c" << sub << "\t" << c << "\n";
-
-		}
-	}
-
-	sub = 0;
-	for (int j = col / 2; j > 10; j--) {
-		if (sub < color[row / 2][j + 10][0] - color[row / 2][j][0] + color[row / 2][j + 10][1] - color[row / 2][j][1]) {
-			d = j;
-			sub = color[row / 2][j + 10][0] - color[row / 2][j][0] + color[row / 2][j + 10][1] - color[row / 2][j][1];
-			cout << "d" << sub << "\t" << d << "\n";
-
-		}
-	}*/
-	//cout << a <<"\t"<< b << "\t" << c << "\t" << d;
-
-
-	for (int j = 0; j < col; j++) {
-		image.at<cv::Vec3b>(up3, j)[2] = 255;
-		image.at<cv::Vec3b>(up3, j)[1] = 255;
-		image.at<cv::Vec3b>(up3, j)[0] = 255;
-	}
-	for (int j = 0; j < col; j++) {
-		image.at<cv::Vec3b>(down3, j)[2] = 255;
-		image.at<cv::Vec3b>(down3, j)[1] = 255;
-		image.at<cv::Vec3b>(down3, j)[0] = 255;
-	}
-	for (int i = 0; i < row; i++) {
-		image.at<cv::Vec3b>(i, left3)[2] = 255;
-		image.at<cv::Vec3b>(i, left3)[1] = 255;
-		image.at<cv::Vec3b>(i, left3)[0] = 255;
-	}
-	for (int i = 0; i < row; i++) {
-		image.at<cv::Vec3b>(i, right3)[2] = 255;
-		image.at<cv::Vec3b>(i, right3)[1] = 255;
-		image.at<cv::Vec3b>(i, right3)[0] = 255;
-	}
-	
-
-
-	// create 4 windows
-	cv::namedWindow("Original Imageh");
-	cv::namedWindow("Original Images");
-	cv::namedWindow("Original Imagev");
-
-	// show 4 windows
-	cv::imshow("Original Imageh", image);
-	cv::imshow("Original Images", S);
-	cv::imshow("Original Imagev", V);
-	cv::waitKey(0);
-
+	close(serv_sock);
+	close(clnt_sock);
+	//cv::waitKey(0);
 
 	return 0;
 }
 
+
+
+cv::Mat masking(cv::Mat image, int degree, int cloudy) {//60 50
+	cv::Mat black;
+	cv::Mat gray_image;
+	medianBlur(image, image, 7);
+	cv::cvtColor(image, gray_image, CV_BGR2GRAY); // 흑백영상으로 변환
+	cv::adaptiveThreshold(gray_image, black, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 401, degree);
+	if (degree == cloudy) {
+		cv::imshow("Tight masking", black);
+	}
+	else {
+		cv::imshow("Rough masking", black);
+	}
+
+	return black;//흑백으로 마스킹된 이미지 반환
+}
+
+int boundary(int * index1, int * index2) {
+	int size1, size2;
+	size1 = (index1[1] - index1[0])*(index1[3] - index1[2]);
+	size2 = (index2[1] - index2[0])*(index2[3] - index2[2]);
+
+	//cout << "경계차이 비율 : " << (float)size2 / size1 * 100 << "\n";
+	if (((float)size2 / size1 * 100) > 100 && ((float)size2 / size1 * 100) < 200) {
+		//cout << "경계선이 모호합니다" << "\n";
+		return 1;
+	}
+	return 0;
+}
+
+void fill(cv::Mat black) {
+	int row = black.rows;
+	int col = black.cols;
+	int read = -1;
+	int start = 0;
+	int end = 0;
+
+	for (int i = 0; i < row; i++) {
+		int x = col - 1;
+		while (x >= 0) {
+			read = black.at<uchar>(i, x);
+			if (read == 0) {
+				end = x;
+				break;
+			}
+			x--;
+		}
+		x = 0;
+		while (x < col) {
+			read = black.at<uchar>(i, x);
+			if (read == 0) {
+				start = x;
+				break;
+			}
+			x++;
+		}
+		for (int j = start; j < end; j++)
+			black.at<uchar>(i, j) = 0;
+		start = 0;
+		end = 0;
+	}
+
+	for (int i = 0; i < col; i++) {
+		int x = row - 1;
+		while (x >= 0) {
+			read = black.at<uchar>(x, i);
+			if (read == 0) {
+				end = x;
+				break;
+			}
+			x--;
+		}
+		x = 0;
+		while (x < row) {
+			read = black.at<uchar>(x, i);
+			if (read == 0) {
+				start = x;
+				break;
+			}
+			x++;
+		}
+		for (int j = start; j < end; j++)
+			black.at<uchar>(j, i) = 0;
+		start = 0;
+		end = 0;
+	}
+}
+
+int * find(cv::Mat black) {
+	int row = black.rows;
+	int col = black.cols;
+	int left = 0, right = 0, top = 0, bottom = 0;
+	int read = -1;
+	bool flag = false;
+	for (int i = 0; i < row; i++) {//find top
+		for (int j = 0; j < col; j++) {
+			read = black.at<uchar>(i, j);
+			if (read == 0) {
+				top = i;
+				read = -1;
+				flag = true;
+				break;
+			}
+		}
+		if (flag) {
+			flag = false;
+			break;
+		}
+	}
+	for (int i = row - 1; i >= 0; i--) {//find bottom
+		for (int j = 0; j < col; j++) {
+			read = black.at<uchar>(i, j);
+			if (read == 0) {
+				bottom = i;
+				read = -1;
+				flag = true;
+				break;
+			}
+		}
+		if (flag) {
+			flag = false;
+			break;
+		}
+	}
+	for (int i = 0; i < col; i++) {//find left
+		for (int j = 0; j < row; j++) {
+			read = black.at<uchar>(j, i);
+			if (read == 0) {
+				left = i;
+				read = -1;
+				flag = true;
+				break;
+			}
+		}
+		if (flag) {
+			flag = false;
+			break;
+		}
+	}
+	for (int i = col - 1; i >= 0; i--) {//find right
+		for (int j = 0; j < row; j++) {
+			read = black.at<uchar>(j, i);
+			if (read == 0) {
+				right = i;
+				read = -1;
+				flag = true;
+				break;
+			}
+		}
+		if (flag) {
+			flag = false;
+			break;
+		}
+	}
+	//cout << "left" << left << "right" << right << endl;
+	//cout << "top" << top << "bottom" << bottom << endl;
+	int * index = (int *)malloc(sizeof(int) * 4);
+	index[0] = left;
+	index[1] = right;
+	index[2] = top;
+	index[3] = bottom;
+	return index;
+}//884281
+cv::Mat cutting(cv::Mat image, int * index) {//마스킹된 이미지를 기반으로 원본 이미지를 자름
+	int left = index[0];
+	int right = index[1];
+	int top = index[2];
+	int bottom = index[3];
+
+	cv::Mat capture = image;
+	if (!(left == 0 || right == 0 || top == 0 || bottom == 0))//예외 처리
+		capture = image(cv::Range(top, bottom), cv::Range(left, right));
+
+	return capture;//잘린 이미지 리턴
+}
+
+float symmetry(cv::Mat image) {
+	int row = image.rows;
+	int col = image.cols;
+	int end_top = 0, start_bottom = row / 2;
+
+	if (row % 2 == 0) // even
+		end_top = row / 2;
+	else //odd
+		end_top = (row / 2) + 1; // row가 짝수든 홀수든 균등하게 보정
+
+	cv::Mat top = image(cv::Range(0, end_top), cv::Range(0, col));
+	cv::Mat bottom = image(cv::Range(start_bottom, row), cv::Range(0, col));
+	cv::flip(bottom, bottom, -1);
+	int count = 0;
+	int read_top = -1, read_bottom = -1;
+	for (int i = 0; i < end_top; i++) {
+		for (int j = 0; j < col; j++) {
+			read_top = top.at<uchar>(i, j);
+			read_bottom = bottom.at<uchar>(i, j);
+			if (read_top != read_bottom) {
+				count++;
+			}
+		}
+	}
+	cv::imshow("top", top);
+	cv::imshow("bottom", bottom);
+	float matrix = end_top * col;
+	return (float)((matrix - count) / matrix) * 100;
+}
+
+float histogram(cv::Mat capture) { // 30정도
+	cv::Mat dst;
+	cv::Mat bgr[3];
+	cv::Mat hist; //Histogram 계산값 저장
+	int channel[] = { 0,1,2 };
+	int histSize = 255; //Histogram 가로값의 수
+	int count = 0;
+	float range[] = { 0,255.0 };
+	const float * ranges = range;
+	int hist_w = 512; int hist_h = 400;
+	int number_bins = 255;
+	int bin_w = cvRound((double)hist_w / number_bins);
+	unsigned row2 = capture.rows; unsigned col2 = capture.cols; //자른 사진의 크기 저장
+
+	cvtColor(capture, dst, CV_HSV2BGR); //Color 변경
+	calcHist(&dst, 3, channel, cv::Mat(), hist, 1, &histSize, &ranges, true, false); //Histogram 계산
+	cv::Mat histImage(hist_h, hist_w, CV_8UC3, cv::Scalar(0, 0, 0));
+	normalize(hist, hist, 0, histImage.rows, cv::NORM_MINMAX, -1, cv::Mat());
+
+	for (int i = 1; i < number_bins; i++) {    //Histogram 선 그리기
+		line(histImage, cv::Point(bin_w*(i - 1), hist_h - cvRound(hist.at<float>(i - 1))), cv::Point(bin_w*(i), hist_h - cvRound(hist.at<float>(i))), cv::Scalar(0, 255, 0), 2, 8, 0);
+	}
+
+	for (int i = 0; i < histSize; i++) { //색의 다양성 검출
+		//printf("%d번째 %f \n", i, hist.at<float>(i));
+		if (hist.at<float>(i) > 229) {
+			count++;
+		}
+	}
+
+	printf("카운트 수 : %d\n", count);
+
+	if (count > 30) {
+		//printf("다양한 색조를 보입니다.\n");
+	}
+	else {
+		//printf("다양한 색조를 보이지 않습니다.\n");
+	}
+
+	cv::namedWindow("Histogram", CV_WINDOW_AUTOSIZE);
+	cv::imshow("HSV2BGR", dst);
+	cv::imshow("Histogram", histImage);
+	return ((float)count / 40.0) * 100;
+}
