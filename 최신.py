@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[6]:
+# In[14]:
 
 
 import cv2
@@ -117,7 +117,7 @@ yakk = croll[0:120,126:250]
 
 
 # 약 설정
-imgx = croll21[0:370,0:780]
+imgx = croll3#croll21[0:370,0:780]
 imglast = imgx.copy()
 #imgx = cv2.cvtColor(imgx, cv2.COLOR_BGR2Lab)
 #cv2.imshow("lab",imgx)
@@ -195,126 +195,33 @@ for i in range(row):
 
 
 # 그림자 제거            
-
 for i in range(row):
     for j in range(col):
         x = (v[i][j]-min)/((max-min)+1e-10)
         if(x<=0.3) :
             threshMap[i][j] = 0
-            imgx[i][j]=0
-            imglast[i][j]=0
 
 
-for i in range(row):
-    for j in range(col):
-        if (threshMap[i][j]==0) :
-            imgx[i][j]=0
-            imglast[i][j]=0
 
             
 cv2.imshow("shadow",threshMap)
 
             
 #가운데 기준으로 흰색 경계부분 검출
+def fill(imgx,imglast,threshMap):
+    kernel = np.ones((19,19),np.uint8)
+    threshMap = cv2.morphologyEx(threshMap, cv2.MORPH_CLOSE, kernel)
+    #cv2.imshow("closing",closing)
+    threshMap = cv2.GaussianBlur(threshMap, (7,7), 0)            
+    cv2.imshow("fill",threshMap)
+    for i in range(row):
+        for j in range(col):
+            if (threshMap[i][j]==0) :
+                imgx[i][j]=0
+                imglast[i][j]=0
+    return imglast,threshMap
 
-check=0
-#L=[0,0,0]
-
-
-for i in range(int(row/2),row):
-    for j in range(int(col/2),col-5):
-        if((threshMap[i][j+1]+threshMap[i][j+2]+threshMap[i][j+3]+threshMap[i][j+4]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0        
-    for j in range(int(col/2),5,-1):
-        if((threshMap[i][j-1]+threshMap[i][j-2]+threshMap[i][j-3]+threshMap[i][j-4]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0       
-
-for i in range(int(row/2),0,-1):
-    for j in range(int(col/2),col-5):
-        if((threshMap[i][j+1]+threshMap[i][j+2]+threshMap[i][j+3]+threshMap[i][j+4]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0
-            
-    for j in range(int(col/2),5,-1):
-        if((threshMap[i][j-1]+threshMap[i][j-2]+threshMap[i][j-3]+threshMap[i][j-4]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0
-            
-for j in range(int(col/2),col):
-    for i in range(int(row/2),row-5):
-        if((threshMap[i+1][j]+threshMap[i+2][j]+threshMap[i+3][j]+threshMap[i+4][j]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0
-    for i in range(int(row/2),5,-1):
-        if((threshMap[i-1][j]+threshMap[i-2][j]+threshMap[i-3][j]+threshMap[i-4][j]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0 
-            
-for j in range(int(col/2),0,-1):
-    for i in range(int(row/2),row-5):
-        if((threshMap[i+1][j]+threshMap[i+2][j]+threshMap[i+3][j]+threshMap[i+4][j]) < 10):
-#            threshMap[i][j]=255
-            check=check+1
-        if(check>0):
-            
-            break
-        else:    
-            threshMap[i][j]=255
-    check=0
-    for i in range(int(row/2),5,-1):
-        if((threshMap[i-1][j]+threshMap[i-2][j]+threshMap[i-3][j]+threshMap[i-4][j]) < 10):
-#            threshMap[i][j] = 255
-            check=check+1
-        if(check>0):
-            break
-        else:    
-            threshMap[i][j]=255
-
-#-----------------------fill함수 수정--------------------------------------------------------
-#check =0
-#for i in range(row):
-#    for j in range(col):
-        
-#-------------------------------------------------------------------------------
-threshMap = cv2.GaussianBlur(threshMap, (7,7), 0)            
-cv2.imshow("fill",threshMap)
+imglast,threshMap = fill(imgx,imglast,threshMap)
 
 #------------------------------------------------------------------------------------------------------------------------------
 
@@ -331,10 +238,6 @@ contours = sorted(contours, key = cv2.contourArea)
 
 
 x,y,w,h = cv2.boundingRect(contours[-1])
-image = cv2.drawContours(threshMap, contours, -1, (0,255,0), 3)
-cv2.imshow("line",image)
-cv2.rectangle(imgx,(x,y),(x+w,y+h),(255,255,255),2)
-print(x,y,w,h)
 aaa = threshMap[y:y+h,x:x+w]
 bbb = imglast[y:y+h,x:x+w]
 cv2.imshow("2",aaa)
