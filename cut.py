@@ -8,12 +8,12 @@ import numpy as np
 import cv2 as cv
 
 #음식 사진에서 가장 큰 원 추출, 매개변수 -> 이미지
-def test(shape_img):
+def test(shape_img, filename):
     #이미지 불러온뒤 224*224로 resize
     shape_img = cv.resize(shape_img,(112,112),interpolation = cv.INTER_LINEAR_EXACT)
     
     #이미지 불러온뒤 gray 스케일로 변경 및 resize
-    img_gray = cv.imread(name, cv.IMREAD_GRAYSCALE)
+    img_gray = cv.cvtColor(shape_img,cv.COLOR_BGR2GRAY)
     img_gray = cv.resize(img_gray,(112,112),interpolation = cv.INTER_LINEAR_EXACT)
 
     img_gray = cv.medianBlur(img_gray,5)
@@ -49,7 +49,7 @@ def test(shape_img):
                 shape_img[j][i] = 0
 
     # 자른 이미지 저장
-#     path = 'C:/Users/jhkim/OneDrive/Desktop/' + str(num+10)+'.jpg'
+#     path = 'C:/Users/jhkim/OneDrive/Desktop/' + filename+'.jpg'
 #     cv.imwrite(path, shape_img)
 
     # 자른 이미지 리턴
